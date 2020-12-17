@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Tableau de bord xAPI : QUIZZ</title>
+        <script src="main.js"></script>
+        <script src="chart.min.js"></script>
+        <link rel="stylesheet" href="theme.css">
+    </head>
+
+    <body class="container-fluid">
+        <h1 class="mb-4 mt-3">Tableau de bord xAPI</h1>
+
+        <div class="mb-4">
+            <button class="btn btn-outline-info" onclick="generate()">Générer un jeu de données</button>
+            <button class="btn btn-outline-info" onclick="refresh()">Charger / Rafraichir</button>
+            <select class="form-select form-select-sm" id="quizz" name="quizz" aria-label="Default select example" style="width: 200px;"></select>
+        </div>
+        
+        <div class="row">
+            <div class="col-2">
+                <h3 class="mb-3">Activité</h1>
+                <div id="activity"></div>
+            </div>
+            <div class="col-2">
+                <h3 class="mb-3">Classement</h1>
+                <div id="ranking"></div>
+            </div>
+            <div class="col-8" id="panneauStatsGrap" >
+                <h3 class="mb-3">Statistiques générales</h3>
+                <div class="row bg-light mb-3">
+                    <div class="row ">
+                        <canvas id="stats" class="mb-3" aria-label="Hello ARIA World" role="img" width="300" height="300" style="max-width: 300px;" ></canvas>
+                        <canvas id="stats2" class="mb-3" aria-label="Hello ARIA World" role="img" width="300" height="300" style="max-width: 300px;"></canvas>
+                    </div>                        
+                    <canvas id="stats3" class="mb-3" aria-label="Hello ARIA World" role="img" width="300" height="300" style="max-width: 300px;"></canvas>
+                    <canvas id="stats4" class="mb-3" aria-label="Hello ARIA World" role="img" width="300" height="300" style="max-width: 300px;"></canvas>
+                </div>
+                <h3 class="mb-3">Statistiques individuelles</h3>                
+                <select class="form-select form-select-sm" id="Apprenants" name="Apprenants" aria-label="Default select example" style="width: 200px;"></select>
+                <div class="row bg-light">
+                    <div class="row ">                        
+                        <canvas id="statsIndNotes" class="mb-3" aria-label="Hello ARIA World" role="img" width="300" height="300" style="max-width: 300px;" ></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let succesChart
+            let repartitionChart
+            jQuery(document).ready(function($){
+                $('#panneauStatsgraph').hide()
+                $('#panneauStatsgraph').fadeIn('slow')
+                dataset.getTracesDeCreaQuizz(function(reponse){
+                    $('#quizz').append(formatter.quizz(reponse))
+                    refresh()
+                })
+                $('#quizz').change(function() {
+                    window.dataset.activityId="http://learnxapi.fr/activities/quiz/"+$('#quizz').val()
+                    refresh()
+                });
+               //('#quizz option:eq(1)').prop('selected', true); $
+                                
+            })
+
+
+            function generate() {
+                dataset.post(refresh)
+            }
+
+            function refresh() {
+                // Display activity stream.
+                dataset.get(function(statements) {
+                    $('#activity').html(formatter.statements(statements))
+                    $('#Apprenants').html(formatter.apprenants(statements))
+                }, 30)
+
+                // Display ranking.
+                dataset.top10(function(statements) {
+                    $('#ranking').html(formatter.statementsTop(statements)+ '<div><button class="btn btn-xs btn-outline-info" onclick="refresh()">Plus</button></div>')
+                })
+
+                // Display stats chart.
+                dataset.successStats(function(stats) {
+                    var ctx = document.getElementById('stats').getContext('2d');
+                    succesChart = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Echec', 'Réussite'],
+                            datasets: [{
+                                data: stats,
+                                backgroundColor: [
+                                    'rgba(220, 53, 69, 1)',
+                                    'rgba(40, 167, 69, 1)',
+                                ]
+                            }]
+                        },
+                        options:{
+                            onClick: function(evt, elem) {
+                                var activePoints = succesChart.getElementsAtEvent(evt);
+                                formatter.garde(succesChart.data.labels[activePoints[0]["_index"]])  
+                                                             
+                            }
+                        }
+                    })                
+                })
+
+                dataset.repartition(function(stats2){
+                    var ctx = document.getElementById('stats2').getContext('2d');
+                    repartitionChart=new Chart(ctx, {
+                        type: 'polarArea',
+                        data: {
+                            labels: ['Moins de 20', 'De 20 à 39', 'De 40 à 59', 'De 60 à 79', 'Plus de 80'],
+                            datasets: [{
+                                data: stats2,
+                                backgroundColor: ['rgba(250, 50, 72, 1)','rgba(225, 100, 70, 1)','rgba(200, 150, 20, 1)','rgba(100, 200, 132, 1)','rgba(40, 167, 69, 1)']
+                            }]
+                        }
+                    });
+                    repartitionChart.originData=stats2
+                })
+
+                dataset.succesParQuestionLines(function(cptFauxVrai){
+                    var ctx = document.getElementById('stats4').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Q1', 'Q2', 'Q3', 'Q4', 'Q4'],
+                            datasets: [
+                                {
+                                    label:"Nb de réponses fausses",
+                                    backgroundColor:'rgba(220, 53, 69, 0.7)',
+                                    pointBackgroundColor:'rgba(220, 53, 69, 1)',
+                                    data:cptFauxVrai[0]
+                                },
+                                {
+                                    label:"Nb de réponses exactes",
+                                    backgroundColor:'rgba(40, 167, 69, 0.7)',
+                                    pointBackgroundColor:'rgba(40, 167, 69, 1)',
+                                    data:cptFauxVrai[1]
+                                }
+                            ],
+                        }
+                    });
+                })
+
+                dataset.succesParQuestion(function(cptFauxVrai){
+                    var ctx = document.getElementById('stats3').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'radar',
+                        data: {
+                            labels: ['Q1', 'Q2', 'Q3', 'Q4', 'Q4'],
+                            datasets: [
+                                {
+                                    label:"Nb de réponses fausses",
+                                    backgroundColor:'rgba(220, 53, 69, 0.7)',
+                                    pointBackgroundColor:'rgba(220, 53, 69, 1)',
+                                    data:cptFauxVrai[0]
+                                },
+                                {
+                                    label:"Nb de réponses exactes",
+                                    backgroundColor:'rgba(40, 167, 69, 0.7)',
+                                    pointBackgroundColor:'rgba(40, 167, 69, 1)',
+                                    data:cptFauxVrai[1]
+                                }
+                            ],
+                        },
+                        options:{
+                            scale: {
+                                angleLines: {
+                                    display: false
+                                },
+                                suggestedMin: 0,
+                                suggestedMax: 50
+                            }                            
+                        }
+                    });
+                })
+            }
+        </script>
+    </body>
+</html>

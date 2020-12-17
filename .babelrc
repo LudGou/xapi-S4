@@ -1,0 +1,10 @@
+{
+    "presets": ["@babel/preset-env"],
+    "plugins": [
+        ["prismjs", {
+            "languages": ["json"],
+            "theme": "okaidia",
+            "css": true
+        }]
+    ]
+}
